@@ -753,13 +753,23 @@
 
         async function loadEntryForDate() {
             const selectedDate = document.getElementById('entryDate').value;
+            console.log('📅 Lade Eintrag für Datum:', selectedDate);
+            console.log('📊 Verfügbare Einträge:', entries.length);
             
             // Suche nach Eintrag für dieses Datum
             const entry = entries.find(e => e.date === selectedDate);
+            console.log('🔍 Gefundener Eintrag:', entry);
             
             if (entry) {
                 // LADE BESTEHENDEN EINTRAG IN DIE TEXTFELDER
                 currentEntry = entry;
+                console.log('✅ Lade Daten in Felder:', {
+                    field1: entry.field1,
+                    field2: entry.field2,
+                    field3: entry.field3,
+                    mood: entry.mood
+                });
+                
                 document.getElementById('field1').value = entry.field1 || '';
                 document.getElementById('field2').value = entry.field2 || '';
                 document.getElementById('field3').value = entry.field3 || '';
@@ -776,6 +786,7 @@
                 updateEntryStatus('existing', `✅ Eintrag vom ${formatDate(selectedDate)} wird angezeigt`);
             } else {
                 // Neuer Eintrag - Felder leeren
+                console.log('➕ Kein Eintrag gefunden - neue Eingabe');
                 currentEntry = null;
                 clearFormFields();
                 updateEntryStatus('new', `➕ Neuer Eintrag für ${formatDate(selectedDate)}`);
@@ -883,16 +894,14 @@
                     if (error) throw error;
                     
                     currentUser = data.user;
-                    showApp();
+                    await showApp(); // Await hinzugefügt
                     showNotification('Erfolgreich angemeldet!', 'success');
-                    await loadEntries();
                 } else {
                     currentUser = { email: email, id: 'demo-user' };
                     localStorage.setItem('currentUser', JSON.stringify(currentUser));
                     
-                    showApp();
+                    await showApp(); // Await hinzugefügt
                     showNotification('Erfolgreich angemeldet! (Demo-Modus)', 'success');
-                    await loadEntries();
                 }
             } catch (error) {
                 showNotification('Anmeldung fehlgeschlagen: ' + error.message, 'error');
@@ -916,8 +925,7 @@
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
                 currentUser = session.user;
-                showApp();
-                await loadEntries();
+                await showApp(); // Await hinzugefügt
             }
         }
 
@@ -930,11 +938,14 @@
             }
         }
 
-        function showApp() {
+        async function showApp() {
             document.getElementById('authSection').classList.add('hidden');
             document.getElementById('mainApp').classList.remove('hidden');
             document.getElementById('exportBtn').style.display = 'block';
             document.getElementById('logoutBtn').style.display = 'block';
+            
+            // WICHTIG: Einträge laden direkt nach dem Anzeigen der App
+            await loadEntries();
         }
 
         function showAuth() {
@@ -1033,6 +1044,8 @@
 
         async function loadEntries() {
             try {
+                console.log('🔄 Lade Einträge...');
+                
                 if (supabase) {
                     const { data, error } = await supabase
                         .from('diary_entries')
@@ -1040,18 +1053,25 @@
                         .eq('user_id', currentUser.id)
                         .order('date', { ascending: false });
 
-                    if (error) throw error;
+                    if (error) {
+                        console.error('❌ Fehler beim Laden:', error);
+                        throw error;
+                    }
                     
+                    console.log('✅ Geladene Daten:', data);
                     entries = data || [];
+                    console.log('📊 Anzahl Einträge:', entries.length);
                 } else {
                     const saved = localStorage.getItem('diaryEntries');
                     entries = saved ? JSON.parse(saved) : [];
+                    console.log('💾 Demo-Modus: Anzahl Einträge:', entries.length);
                 }
                 
                 if (document.getElementById('entryDate').value) {
                     loadEntryForDate();
                 }
             } catch (error) {
+                console.error('❌ Laden fehlgeschlagen:', error);
                 showNotification('Fehler beim Laden der Einträge: ' + error.message, 'error');
                 entries = [];
             }
